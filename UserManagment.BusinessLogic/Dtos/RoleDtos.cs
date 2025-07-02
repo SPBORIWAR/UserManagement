@@ -25,5 +25,12 @@ namespace UserManagement.BusinessLogic.Dtos
         public int? TenantId { get; set; }
     }
 
+    public class AssignRoleDto
+    {
+        public long UserId { get; set; }
+        public int RoleId { get; set; }
+    }
+
+
 
 }
