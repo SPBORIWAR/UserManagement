@@ -12,7 +12,7 @@ using UserManagement.EntityFrameworkCore.Context;
 namespace UserManagement.EntityFrameworkCore.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250702100326_Initial - 1")]
+    [Migration("20250702134715_Initial-1")]
     partial class Initial1
     {
         /// <inheritdoc />
@@ -431,7 +431,7 @@ namespace UserManagement.EntityFrameworkCore.Migrations
                     b.Property<string>("Region")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("RoleId")
+                    b.Property<int?>("RoleId")
                         .HasColumnType("int");
 
                     b.Property<int>("TenantId")
@@ -634,19 +634,15 @@ namespace UserManagement.EntityFrameworkCore.Migrations
 
             modelBuilder.Entity("UserManagement.EntityFrameworkCore.Models.User", b =>
                 {
-                    b.HasOne("UserManagement.EntityFrameworkCore.Models.Role", "Role")
+                    b.HasOne("UserManagement.EntityFrameworkCore.Models.Role", null)
                         .WithMany("Users")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("RoleId");
 
                     b.HasOne("UserManagement.EntityFrameworkCore.Models.Tenant", "Tenant")
                         .WithMany("Users")
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Role");
 
                     b.Navigation("Tenant");
                 });

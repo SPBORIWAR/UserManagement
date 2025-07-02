@@ -1,16 +1,11 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using UserManagement.BusinessLogic.Dtos;
 using UserManagement.EntityFrameworkCore.Models;
 using UserManagement.EntityFrameworkCore.Repository;
@@ -22,6 +17,7 @@ namespace UserManagement.BusinessLogic.AuthManagement
         private readonly IRepository<User> _userRepo;
         private readonly IRepository<Role> _roleRepo;
         private readonly IRepository<Tenant> _tenantRepo;
+        private readonly IRepository<UserRole> _userRoleRepo;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IConfiguration _config;
 
@@ -29,12 +25,14 @@ namespace UserManagement.BusinessLogic.AuthManagement
             IRepository<User> userRepo,
             IRepository<Role> roleRepo,
             IRepository<Tenant> tenantRepo,
+            IRepository<UserRole> userRoleRepo,
             IPasswordHasher<User> passwordHasher,
             IConfiguration config)
         {
             _userRepo = userRepo;
             _roleRepo = roleRepo;
             _tenantRepo = tenantRepo;
+            _userRoleRepo = userRoleRepo;
             _passwordHasher = passwordHasher;
             _config = config;
         }
@@ -53,20 +51,29 @@ namespace UserManagement.BusinessLogic.AuthManagement
                 UserName = dto.UserName,
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
-                TenantId = dto.TenantId,
-                RoleId = dto.RoleId
+                TenantId = dto.TenantId
             };
 
             user.Password = _passwordHasher.HashPassword(user, dto.Password);
 
             await _userRepo.InsertAsync(user);
             await _userRepo.SaveChangesAsync();
+
+            // Assign role to user in UserRole mapping table
+            var userRole = new UserRole
+            {
+                UserId = user.Id,
+                RoleId = dto.RoleId,
+                TenantId = dto.TenantId
+            };
+
+            await _userRoleRepo.InsertAsync(userRole);
+            await _userRoleRepo.SaveChangesAsync();
         }
 
         public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
         {
             var user = await _userRepo.GetAll()
-                .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.UserName == dto.UserName && u.TenantId == dto.TenantId)
                 ?? throw new InvalidOperationException("Invalid user or tenant");
 
@@ -74,7 +81,7 @@ namespace UserManagement.BusinessLogic.AuthManagement
             if (result != PasswordVerificationResult.Success)
                 throw new InvalidOperationException("Invalid password");
 
-            var accessToken = GenerateAccessToken(user);
+            var accessToken = await GenerateAccessToken(user);
             var refreshToken = GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
@@ -92,14 +99,13 @@ namespace UserManagement.BusinessLogic.AuthManagement
         public async Task<LoginResponseDto> RefreshTokenAsync(string refreshToken)
         {
             var user = await _userRepo.GetAll()
-                .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.RefreshToken == refreshToken)
                 ?? throw new InvalidOperationException("Invalid refresh token");
 
             if (user.RefreshTokenExpiryTime < DateTime.UtcNow)
                 throw new InvalidOperationException("Refresh token expired");
 
-            var newAccessToken = GenerateAccessToken(user);
+            var newAccessToken = await GenerateAccessToken(user);
             var newRefreshToken = GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
@@ -113,20 +119,34 @@ namespace UserManagement.BusinessLogic.AuthManagement
             };
         }
 
-        private string GenerateAccessToken(User user)
+        private async Task<string> GenerateAccessToken(User user)
         {
             var key = Encoding.ASCII.GetBytes(_config["Jwt:Key"]);
             var tokenHandler = new JwtSecurityTokenHandler();
 
+            // Fetch user's roles via UserRole mapping
+            var roleMappings = await _userRoleRepo.GetAllIncluding(ur => ur.Role)
+                .Where(ur => ur.UserId == user.Id && ur.TenantId == user.TenantId)
+                .ToListAsync();
+
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),          // <- standard NameIdentifier
-                new Claim(ClaimTypes.Name, user.UserName),                         // <- standard Name maps to unique_name
-                new Claim("TenantId", user.TenantId.ToString()),                   // <- custom
-                new Claim("UserId", user.Id.ToString()),                           // <- custom
-                new Claim("RoleId", user.Role.Id.ToString()),                      // <- custom
-                new Claim(ClaimTypes.Role, user.Role.Name)                         // <- standard Role
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim("TenantId", user.TenantId.ToString()),
+                new Claim("UserId", user.Id.ToString())
             };
+
+            // Add all roles to claims
+            foreach (var ur in roleMappings)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
+            }
+
+            if (roleMappings.Any())
+            {
+                claims.Add(new Claim("PrimaryRole", roleMappings.First().Role.Name));
+            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -140,8 +160,6 @@ namespace UserManagement.BusinessLogic.AuthManagement
             return tokenHandler.WriteToken(token);
         }
 
-
-
         private string GenerateRefreshToken()
         {
             var randomBytes = new byte[32];
@@ -150,6 +168,4 @@ namespace UserManagement.BusinessLogic.AuthManagement
             return Convert.ToBase64String(randomBytes);
         }
     }
-
-
 }

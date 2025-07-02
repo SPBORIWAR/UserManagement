@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UserManagement.BusinessLogic.Dtos;
+﻿using UserManagement.BusinessLogic.Dtos;
 using UserManagement.BusinessLogic.SessionManagment;
 using UserManagement.EntityFrameworkCore.Models;
 using UserManagement.EntityFrameworkCore.Repository;
@@ -44,7 +39,7 @@ namespace UserManagement.BusinessLogic.RoleManagement
 
         public async Task<RoleDto> GetRoleByIdAsync(long id)
         {
-            var tenantId = _session.TenantId;            
+            var tenantId = _session.TenantId;
             var role = await _roleRepository.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId);
             if (role == null || role.TenantId != _session.TenantId)
                 throw new UnauthorizedAccessException("Cannot modify roles outside your tenant.");
@@ -61,7 +56,7 @@ namespace UserManagement.BusinessLogic.RoleManagement
         {
             CheckRolePermission();
 
-            var tenantIdToUse = _session.TenantId != 0 ? _session.TenantId : dto.TenantId; 
+            var tenantIdToUse = _session.TenantId != 0 ? _session.TenantId : dto.TenantId;
             var sessionUserId = _session.UserId;
             var role = new Role
             {
@@ -85,13 +80,13 @@ namespace UserManagement.BusinessLogic.RoleManagement
         public async Task UpdateRoleAsync(RoleDto dto)
         {
             CheckRolePermission();
-            var tenantIdToUse = _session.TenantId != 0 ? _session.TenantId : dto.TenantId;            
+            var tenantIdToUse = _session.TenantId != 0 ? _session.TenantId : dto.TenantId;
             var role = await _roleRepository.FirstOrDefaultAsync(r => r.Id == dto.Id && r.TenantId == tenantIdToUse); ;
             if (role == null || role.TenantId != _session.TenantId)
                 throw new UnauthorizedAccessException("Cannot modify roles outside your tenant.");
 
             role.Name = dto.Name;
-            await _roleRepository.UpdateAsync(role);  
+            await _roleRepository.UpdateAsync(role);
             await _roleRepository.SaveChangesAsync();
         }
 
@@ -107,6 +102,4 @@ namespace UserManagement.BusinessLogic.RoleManagement
             await _roleRepository.SaveChangesAsync();
         }
     }
-
-
 }

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace UserManagement.BusinessLogic.SessionManagment
+﻿namespace UserManagement.BusinessLogic.SessionManagment
 {
     public interface ISessionService
     {
@@ -13,5 +7,6 @@ namespace UserManagement.BusinessLogic.SessionManagment
         int TenantId { get; }
         int RoleId { get; }
         List<string> Roles { get; }
+        string PrimaryRole { get; }
     }
 }

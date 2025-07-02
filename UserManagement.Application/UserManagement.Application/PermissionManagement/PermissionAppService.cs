@@ -1,12 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UserManagement.BusinessLogic.Dtos;
 using UserManagement.BusinessLogic.PermissionManagement;
 
 namespace UserManagement.Application.PermissionManagement
 {
-    
     [Route("api/[controller]")]
     [ApiController]
     public class PermissionAppService : ControllerBase
@@ -81,7 +79,7 @@ namespace UserManagement.Application.PermissionManagement
         /// <summary>
         /// Get granted permissions for the logged-in user
         /// </summary>
-        /// 
+        ///
         [Authorize]
         [HttpGet("granted")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -91,5 +89,4 @@ namespace UserManagement.Application.PermissionManagement
             return Ok(permissions);
         }
     }
-
 }

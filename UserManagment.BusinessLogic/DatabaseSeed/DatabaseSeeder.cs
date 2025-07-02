@@ -1,11 +1,4 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UserManagement.EntityFrameworkCore.Context;
 using UserManagement.EntityFrameworkCore.Models;
 using UserManagement.EntityFrameworkCore.Repository;
 
@@ -53,58 +46,50 @@ namespace UserManagement.BusinessLogic.DatabaseSeed
                     UserName = "superadmin",
                     FirstName = "Super",
                     LastName = "Admin",
-                    RoleId = (int)roleId,
                     TenantId = (int)tenantId
+                    // ❌ Remove RoleId = (int)roleId;
                 };
                 superAdminUser.Password = _passwordHasher.HashPassword(superAdminUser, "SuperAdmin@123");
                 var userId = await _userRepository.InsertAndGetIdAsync(superAdminUser);
 
+                // Map user to role via UserRole mapping table
                 await _userRoleRepository.InsertAsync(new UserRole
                 {
                     UserId = (long)userId,
                     RoleId = (int)roleId,
                     TenantId = (int)tenantId
                 });
+                await _userRoleRepository.SaveChangesAsync();
 
                 // Seed Permissions
                 var permissions = new List<Permission>
-                {
-                    new Permission { Name = "Pages", TenantId = (int) tenantId },
-                    new Permission { Name = "Pages.Dashboard", TenantId = (int) tenantId },
-                    new Permission { Name = "Pages.Administration", TenantId = (int) tenantId },
-                    new Permission { Name = "Pages.Administration.Tenant", TenantId = (int) tenantId },
-                    new Permission { Name = "Pages.Administration.Roles", TenantId = (int) tenantId },
-                    new Permission { Name = "Pages.Administration.Permission", TenantId = (int) tenantId }
-                };
+        {
+            new Permission { Name = "Pages", TenantId = (int)tenantId },
+            new Permission { Name = "Pages.Dashboard", TenantId = (int)tenantId },
+            new Permission { Name = "Pages.Administration", TenantId = (int)tenantId },
+            new Permission { Name = "Pages.Administration.Tenant", TenantId = (int)tenantId },
+            new Permission { Name = "Pages.Administration.Roles", TenantId = (int)tenantId },
+            new Permission { Name = "Pages.Administration.Permission", TenantId = (int)tenantId }
+        };
 
-                // Insert permissions first
                 foreach (var permission in permissions)
                 {
                     await _permissionRepository.InsertAsync(permission);
                 }
-
-                // 🔍 Very important: Save them now to generate their Ids
                 await _permissionRepository.SaveChangesAsync();
 
-                // Now assign them to SuperAdmin role
                 foreach (var permission in permissions)
                 {
                     await _rolePermissionRepository.InsertAsync(new RolePermission
                     {
                         RoleId = (int)roleId,
                         PermissionId = permission.Id,
-                        TenantId = (int)tenantId, // (since RolePermission needs TenantId too based on your model)
+                        TenantId = (int)tenantId,
                         CreatedDate = DateTime.UtcNow
                     });
                 }
-
                 await _rolePermissionRepository.SaveChangesAsync();
-
-
-                await _userRoleRepository.SaveChangesAsync();
             }
         }
-
     }
-
 }

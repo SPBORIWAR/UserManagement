@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace UserManagement.BusinessLogic.Dtos
+﻿namespace UserManagement.BusinessLogic.Dtos
 {
     public class PermissionDto
     {

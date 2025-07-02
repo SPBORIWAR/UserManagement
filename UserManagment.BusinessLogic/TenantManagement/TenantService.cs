@@ -41,13 +41,14 @@ namespace UserManagement.BusinessLogic.TenantManagement
         public async Task<TenantDto> CreateTenantAsync(CreateTenantDto dto)
         {
             using var transaction = await _tenantRepository.BeginTransactionAsync();
-            var seessionUserId = _sessionService.UserId;
+            var sessionUserId = _sessionService.UserId;
+
             try
             {
                 var tenant = new Tenant
                 {
                     Name = dto.Name,
-                    CreatedBy = seessionUserId,
+                    CreatedBy = sessionUserId,
                     CreatedDate = DateTime.UtcNow
                 };
 
@@ -59,14 +60,14 @@ namespace UserManagement.BusinessLogic.TenantManagement
                 {
                     Name = "Admin",
                     TenantId = tenant.Id,
-                    CreatedBy = seessionUserId,
+                    CreatedBy = sessionUserId,
                     CreatedDate = DateTime.UtcNow
                 };
                 var userRole = new Role
                 {
                     Name = "User",
                     TenantId = tenant.Id,
-                    CreatedBy = seessionUserId,
+                    CreatedBy = sessionUserId,
                     CreatedDate = DateTime.UtcNow
                 };
 
@@ -75,17 +76,17 @@ namespace UserManagement.BusinessLogic.TenantManagement
 
                 // Seed default permissions for the tenant
                 var defaultPermissions = new List<string>
-                {
-                    "Pages",
-                    "Pages.Dashboard",
-                    "Pages.Administration",
-                    "Pages.Administration.Tenant",
-                    "Pages.Administration.Tenant.Create",
-                    "Pages.Administration.Role",
-                    "Pages.Administration.Role.Create",
-                    "Pages.Administration.Permission",
-                    "Pages.Administration.Permission.Create"
-                };
+        {
+            "Pages",
+            "Pages.Dashboard",
+            "Pages.Administration",
+            "Pages.Administration.Tenant",
+            "Pages.Administration.Tenant.Create",
+            "Pages.Administration.Role",
+            "Pages.Administration.Role.Create",
+            "Pages.Administration.Permission",
+            "Pages.Administration.Permission.Create"
+        };
 
                 var permissionIds = new List<long>();
 
@@ -95,7 +96,7 @@ namespace UserManagement.BusinessLogic.TenantManagement
                     {
                         Name = permissionName,
                         TenantId = tenant.Id,
-                        CreatedBy = seessionUserId,
+                        CreatedBy = sessionUserId,
                         CreatedDate = DateTime.UtcNow
                     };
                     var permissionId = await _permissionRepository.InsertAndGetIdAsync(permission);
@@ -111,22 +112,21 @@ namespace UserManagement.BusinessLogic.TenantManagement
                         RoleId = (int)adminRoleId,
                         PermissionId = permissionId,
                         TenantId = tenant.Id,
-                        CreatedBy = seessionUserId,
+                        CreatedBy = sessionUserId,
                         CreatedDate = DateTime.UtcNow
                     };
                     await _rolePermissionRepository.InsertAsync(rolePermission);
                 }
                 await _rolePermissionRepository.SaveChangesAsync();
 
-                // Create Admin user
+                // Create Admin user WITHOUT RoleId
                 var adminUser = new User
                 {
                     UserName = $"{tenant.Name.ToLower()}Admin",
                     FirstName = "Admin",
                     LastName = tenant.Name,
-                    RoleId = (int)adminRoleId,
                     TenantId = tenant.Id,
-                    CreatedBy = seessionUserId,
+                    CreatedBy = sessionUserId,
                     CreatedDate = DateTime.UtcNow
                 };
 
@@ -134,13 +134,13 @@ namespace UserManagement.BusinessLogic.TenantManagement
                 var adminUserId = await _userRepository.InsertAndGetIdAsync(adminUser);
                 await _userRepository.SaveChangesAsync();
 
-                // Link Admin user to Admin role
+                // Map Admin user to Admin role via UserRole mapping
                 var userRoleInfo = new UserRole
                 {
                     UserId = (long)adminUserId,
                     RoleId = (int)adminRoleId,
                     TenantId = tenant.Id,
-                    CreatedBy = seessionUserId,
+                    CreatedBy = sessionUserId,
                     CreatedDate = DateTime.UtcNow
                 };
                 await _userRoleRepository.InsertAndGetIdAsync(userRoleInfo);
@@ -155,9 +155,6 @@ namespace UserManagement.BusinessLogic.TenantManagement
                 throw;
             }
         }
-
-
-
 
         public async Task<List<TenantDto>> GetAllTenantsAsync()
         {
@@ -187,5 +184,4 @@ namespace UserManagement.BusinessLogic.TenantManagement
             await _tenantRepository.SaveChangesAsync();
         }
     }
-
 }

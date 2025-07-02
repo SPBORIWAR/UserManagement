@@ -1,10 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace UserManagement.BusinessLogic.SessionManagment
 {
@@ -25,7 +20,7 @@ namespace UserManagement.BusinessLogic.SessionManagment
         public int RoleId => int.Parse(_httpContextAccessor.HttpContext.User.FindFirstValue("RoleId"));
 
         public List<string> Roles => _httpContextAccessor.HttpContext.User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        public string PrimaryRole => _httpContextAccessor.HttpContext.User.FindFirstValue("PrimaryRole");
     }
-
-
 }

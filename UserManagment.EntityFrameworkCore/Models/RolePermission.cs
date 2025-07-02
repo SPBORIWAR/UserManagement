@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace UserManagement.EntityFrameworkCore.Models
+﻿namespace UserManagement.EntityFrameworkCore.Models
 {
     public class RolePermission : Entity<long>
     {
@@ -17,6 +11,4 @@ namespace UserManagement.EntityFrameworkCore.Models
         public int TenantId { get; set; }
         public Tenant Tenant { get; set; }
     }
-
-
 }

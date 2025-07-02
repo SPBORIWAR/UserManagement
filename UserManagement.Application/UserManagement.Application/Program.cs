@@ -79,7 +79,6 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = ClaimTypes.Role           // maps to "role"
     };
 
-
     // Optional: support for SignalR tokens via query string
     options.Events = new JwtBearerEvents
     {
@@ -125,7 +124,6 @@ builder.Services.AddAuthentication(options =>
             return Task.CompletedTask;
         }
     };
-
 });
 // ------------------------------------------------
 // Add Authorization (can extend with policies if needed)
@@ -166,7 +164,6 @@ builder.Services.AddSwaggerGen(c =>
     // 👈 Add this line:
     c.OperationFilter<AuthorizeCheckOperationFilter>();
 });
-
 
 var app = builder.Build();
 

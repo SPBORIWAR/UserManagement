@@ -1,9 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UserManagement.BusinessLogic.Dtos;
 using UserManagement.BusinessLogic.SessionManagment;
 using UserManagement.EntityFrameworkCore.Models;
@@ -15,16 +10,19 @@ namespace UserManagement.BusinessLogic.PermissionManagement
     {
         private readonly IRepository<Permission> _permissionRepo;
         private readonly IRepository<RolePermission> _rolePermissionRepo;
+        private readonly IRepository<UserRole> _userRoleRepo;
         private readonly ISessionService _session;
 
         public PermissionService(
             IRepository<Permission> permissionRepo,
             IRepository<RolePermission> rolePermissionRepo,
-            ISessionService session)
+            ISessionService session,
+            IRepository<UserRole> userRoleRepo)
         {
             _permissionRepo = permissionRepo;
             _rolePermissionRepo = rolePermissionRepo;
             _session = session;
+            _userRoleRepo = userRoleRepo;
         }
 
         // 📌 Create a permission (for this tenant)
@@ -109,15 +107,19 @@ namespace UserManagement.BusinessLogic.PermissionManagement
             return permissions;
         }
 
-        // 📌 Get granted permissions for logged-in user
         public async Task<List<string>> GetGrantedPermissionsForLoggedInUserAsync()
         {
-            var userRoleId = _session.RoleId;
+            var userId = _session.UserId;
             var tenantId = _session.TenantId;
 
+            // Get all roles for user
+            var userRoles = await _userRoleRepo.GetListAsync(ur => ur.UserId == userId && ur.TenantId == tenantId);
+            var roleIds = userRoles.Select(ur => ur.RoleId).ToList();
+
+            // Get permissions for all roles
             var rolePermissions = await _rolePermissionRepo
                 .GetAllIncluding(rp => rp.Permission)
-                .Where(rp => rp.RoleId == userRoleId && rp.TenantId == tenantId)
+                .Where(rp => roleIds.Contains(rp.RoleId) && rp.TenantId == tenantId)
                 .ToListAsync();
 
             var permissions = rolePermissions
@@ -127,9 +129,5 @@ namespace UserManagement.BusinessLogic.PermissionManagement
 
             return permissions;
         }
-
-
     }
-
-
 }
