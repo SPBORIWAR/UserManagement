@@ -93,10 +93,20 @@ namespace UserManagement.BusinessLogic.PermissionManagement
         // 📌 Get permissions by role in current tenant
         public async Task<List<string>> GetPermissionsByRoleAsync(int roleId)
         {
-            var rolePermissions = await _rolePermissionRepo.GetListAsync(rp =>
-                rp.RoleId == roleId && rp.TenantId == _session.TenantId);
+            //var userRoleId = _session.RoleId;
+            var tenantId = _session.TenantId;
 
-            return rolePermissions.Select(rp => rp.Permission.Name).Distinct().ToList();
+            var rolePermissions = await _rolePermissionRepo
+                .GetAllIncluding(rp => rp.Permission)
+                .Where(rp => rp.RoleId == roleId && rp.TenantId == tenantId)
+                .ToListAsync();
+
+            var permissions = rolePermissions
+                .Select(rp => rp.Permission.Name)
+                .Distinct()
+                .ToList();
+
+            return permissions;
         }
 
         // 📌 Get granted permissions for logged-in user
