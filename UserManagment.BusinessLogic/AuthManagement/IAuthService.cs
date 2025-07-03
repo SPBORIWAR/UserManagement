@@ -12,6 +12,10 @@ namespace UserManagement.BusinessLogic.AuthManagement
         Task RegisterAsync(RegisterUserDto dto);
         Task<LoginResponseDto> LoginAsync(LoginDto dto);
         Task<LoginResponseDto> RefreshTokenAsync(string refreshToken);
+        Task ResetPasswordAsync(long userId, string newPassword);
+        Task<LoginResponseDto> SocialLoginAsync(SocialLoginDto dto);
+        Task UpdateProfileAsync(UpdateProfileDto dto);
+        Task<UserProfileDto> GetProfileAsync();
     }
 
 }

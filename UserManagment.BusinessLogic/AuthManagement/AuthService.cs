@@ -1,12 +1,15 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using UserManagement.BusinessLogic.Dtos;
+using UserManagement.BusinessLogic.SessionManagment;
 using UserManagement.EntityFrameworkCore.Models;
 using UserManagement.EntityFrameworkCore.Repository;
 
@@ -20,14 +23,17 @@ namespace UserManagement.BusinessLogic.AuthManagement
         private readonly IRepository<UserRole> _userRoleRepo;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IConfiguration _config;
-
+        private readonly ISessionService _sessionService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         public AuthService(
             IRepository<User> userRepo,
             IRepository<Role> roleRepo,
             IRepository<Tenant> tenantRepo,
             IRepository<UserRole> userRoleRepo,
             IPasswordHasher<User> passwordHasher,
-            IConfiguration config)
+            IConfiguration config,
+            ISessionService sessionService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _userRepo = userRepo;
             _roleRepo = roleRepo;
@@ -35,12 +41,23 @@ namespace UserManagement.BusinessLogic.AuthManagement
             _userRoleRepo = userRoleRepo;
             _passwordHasher = passwordHasher;
             _config = config;
+            _sessionService = sessionService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
+        // ✅ User Registration with duplicate checks
         public async Task RegisterAsync(RegisterUserDto dto)
         {
             var tenant = await _tenantRepo.GetByIdAsync(dto.TenantId)
                          ?? throw new InvalidOperationException("Tenant not found");
+
+            // Duplicate checks
+            if (await _userRepo.AnyAsync(u => u.UserName == dto.UserName))
+                throw new InvalidOperationException("Username already exists.");
+            if (!string.IsNullOrEmpty(dto.EmailAddress) && await _userRepo.AnyAsync(u => u.EmailAddress == dto.EmailAddress))
+                throw new InvalidOperationException("Email already exists.");
+            if (!string.IsNullOrEmpty(dto.PhoneNo) && await _userRepo.AnyAsync(u => u.PhoneNo == dto.PhoneNo))
+                throw new InvalidOperationException("Phone number already exists.");
 
             var role = await _roleRepo.GetAll()
                 .FirstOrDefaultAsync(r => r.Id == dto.RoleId && r.TenantId == dto.TenantId)
@@ -51,6 +68,8 @@ namespace UserManagement.BusinessLogic.AuthManagement
                 UserName = dto.UserName,
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
+                EmailAddress = dto.EmailAddress,
+                PhoneNo = dto.PhoneNo,
                 TenantId = dto.TenantId
             };
 
@@ -59,7 +78,6 @@ namespace UserManagement.BusinessLogic.AuthManagement
             await _userRepo.InsertAsync(user);
             await _userRepo.SaveChangesAsync();
 
-            // Assign role to user in UserRole mapping table
             var userRole = new UserRole
             {
                 UserId = user.Id,
@@ -118,6 +136,134 @@ namespace UserManagement.BusinessLogic.AuthManagement
                 RefreshToken = newRefreshToken
             };
         }
+
+        // ✅ Password Reset
+        public async Task ResetPasswordAsync(long userId, string newPassword)
+        {
+            var user = await _userRepo.GetByIdAsync(userId)
+                       ?? throw new InvalidOperationException("User not found");
+
+            user.Password = _passwordHasher.HashPassword(user, newPassword);
+            await _userRepo.UpdateAsync(user);
+            await _userRepo.SaveChangesAsync();
+        }
+
+        // ✅ Social login configuration (stub for external login integration)
+        public async Task<LoginResponseDto> SocialLoginAsync(SocialLoginDto dto)
+        {
+            var user = await _userRepo.GetAll()
+                .FirstOrDefaultAsync(u => u.EmailAddress == dto.EmailAddress && u.TenantId == dto.TenantId);
+
+            if (user == null)
+            {
+                // Create new user for social login
+                user = new User
+                {
+                    UserName = dto.EmailAddress.Split('@')[0],
+                    EmailAddress = dto.EmailAddress,
+                    FirstName = dto.FirstName,
+                    LastName = dto.LastName,
+                    TenantId = dto.TenantId
+                };
+                await _userRepo.InsertAsync(user);
+                await _userRepo.SaveChangesAsync();
+            }
+
+            var accessToken = await GenerateAccessToken(user);
+            var refreshToken = GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_config.GetValue<int>("Jwt:RefreshTokenExpiryDays"));
+            await _userRepo.UpdateAsync(user);
+            await _userRepo.SaveChangesAsync();
+
+            return new LoginResponseDto
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
+            };
+        }
+
+        public async Task UpdateProfileAsync(UpdateProfileDto dto)
+        {
+            var userId = _sessionService.UserId;
+            var user = await _userRepo.GetByIdAsync(userId)
+                       ?? throw new InvalidOperationException("User not found");
+
+            // Email duplication check
+            if (!string.IsNullOrWhiteSpace(dto.EmailAddress))
+            {
+                if (await _userRepo.AnyAsync(u => u.EmailAddress == dto.EmailAddress && u.Id != userId && u.TenantId == user.TenantId))
+                    throw new InvalidOperationException("Email address already in use.");
+            }
+
+            // Phone number duplication check
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNo))
+            {
+                if (await _userRepo.AnyAsync(u => u.PhoneNo == dto.PhoneNo && u.Id != userId && u.TenantId == user.TenantId))
+                    throw new InvalidOperationException("Phone number already in use.");
+            }
+
+            // Update only provided fields
+            user.FirstName = dto.FirstName ?? user.FirstName;
+            user.LastName = dto.LastName ?? user.LastName;
+            user.EmailAddress = dto.EmailAddress ?? user.EmailAddress;
+            user.PhoneNo = dto.PhoneNo ?? user.PhoneNo;
+            user.Gender = dto.Gender ?? user.Gender;
+            user.DateOfBirth = dto.DateOfBirth ?? user.DateOfBirth;
+            user.Address = dto.Address ?? user.Address;
+            user.City = dto.City ?? user.City;
+            user.Country = dto.Country ?? user.Country;
+
+            // Save profile picture if uploaded
+            if (dto.ProfilePicture != null && dto.ProfilePicture.Length > 0)
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "profile-pictures");
+                if (!Directory.Exists(uploadsFolder))
+                    Directory.CreateDirectory(uploadsFolder);
+
+                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.ProfilePicture.FileName)}";
+                var filePath = Path.Combine(uploadsFolder, fileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await dto.ProfilePicture.CopyToAsync(stream);
+                }
+
+                user.ProfilePicturePath = $"/profile-pictures/{fileName}";
+            }
+
+            await _userRepo.UpdateAsync(user);
+            await _userRepo.SaveChangesAsync();
+        }
+
+        public async Task<UserProfileDto> GetProfileAsync()
+        {
+            var userId = _sessionService.UserId;
+
+            var user = await _userRepo.GetByIdAsync(userId)
+                       ?? throw new InvalidOperationException("User not found");
+
+            var baseUrl = $"{_httpContextAccessor.HttpContext?.Request.Scheme}://{_httpContextAccessor.HttpContext?.Request.Host}";
+
+            return new UserProfileDto
+            {
+                UserName = user.UserName,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                EmailAddress = user.EmailAddress,
+                PhoneNo = user.PhoneNo,
+                Gender = user.Gender,
+                DateOfBirth = user.DateOfBirth,
+                Address = user.Address,
+                City = user.City,
+                Country = user.Country,
+                ProfilePictureUrl = string.IsNullOrEmpty(user.ProfilePicturePath)
+                    ? null
+                    : $"{baseUrl}{user.ProfilePicturePath}"
+            };
+        }
+
 
         private async Task<string> GenerateAccessToken(User user)
         {

@@ -21,4 +21,8 @@
 	  <ProjectReference Include="..\..\UserManagment.BusinessLogic\UserManagement.BusinessLogic.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="wwwroot\profile-pictures\" />
+	</ItemGroup>
+
 </Project>
