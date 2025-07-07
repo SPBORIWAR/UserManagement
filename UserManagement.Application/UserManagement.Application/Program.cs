@@ -18,7 +18,7 @@ using UserManagement.EntityFrameworkCore.Models;
 using UserManagement.EntityFrameworkCore.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
-
+var configuration = builder.Configuration;
 // ------------------------------------------------
 // Configure Database Connection
 // ------------------------------------------------
@@ -41,9 +41,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // ------------------------------------------------
 // Configure CORS
 // ------------------------------------------------
+const string DefaultCorsPolicyName = "AllowAll";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy(DefaultCorsPolicyName, policy =>
     {
         policy
             .AllowAnyHeader()
@@ -56,7 +57,7 @@ builder.Services.AddCors(options =>
 // ------------------------------------------------
 // Configure JWT Authentication
 // ------------------------------------------------
-var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]);
+var key = Encoding.ASCII.GetBytes(configuration["Jwt:Key"]);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -167,6 +168,17 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// ✅ Path base from config
+var pathPrefix = configuration["App:UserManagementServerPathPrefix"] ?? "";
+if (!string.IsNullOrEmpty(pathPrefix) && !pathPrefix.StartsWith("/"))
+{
+    pathPrefix = "/" + pathPrefix;
+}
+if (!string.IsNullOrEmpty(pathPrefix))
+{
+    app.UsePathBase(pathPrefix);
+}
+
 // ------------------------------------------------
 // Middleware Pipeline Configuration
 // ------------------------------------------------
@@ -175,13 +187,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "UserManagement API v1");
+        c.SwaggerEndpoint($"{pathPrefix}/swagger/v1/swagger.json", "UserManagement API v1");
         c.RoutePrefix = "swagger";
     });
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors(DefaultCorsPolicyName);
 
 app.Use(async (context, next) =>
 {
