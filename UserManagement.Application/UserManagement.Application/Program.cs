@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using NSwag;
+using NSwag.Generation.Processors.Security;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
@@ -19,9 +22,7 @@ using UserManagement.EntityFrameworkCore.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
-// ------------------------------------------------
-// Configure Database Connection
-// ------------------------------------------------
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
 
@@ -38,27 +39,10 @@ builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// ------------------------------------------------
-// Configure CORS
-// ------------------------------------------------
-const string DefaultCorsPolicyName = "AllowAll";
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy(DefaultCorsPolicyName, policy =>
-    {
-        policy
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .SetIsOriginAllowed(_ => true)
-            .AllowCredentials();
-    });
-});
-
-// ------------------------------------------------
-// Configure JWT Authentication
-// ------------------------------------------------
+// 1. Configure JWT authentication key
 var key = Encoding.ASCII.GetBytes(configuration["Jwt:Key"]);
 
+// 2. Add JWT Authentication
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -75,46 +59,21 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuer = false,
         ValidateAudience = false,
         ClockSkew = TimeSpan.Zero,
-
-        NameClaimType = ClaimTypes.Name,          // maps to "unique_name"
-        RoleClaimType = ClaimTypes.Role           // maps to "role"
+        NameClaimType = ClaimTypes.Name,
+        RoleClaimType = ClaimTypes.Role
     };
 
-    // Optional: support for SignalR tokens via query string
     options.Events = new JwtBearerEvents
     {
-        OnTokenValidated = context =>
-        {
-            Console.WriteLine("✅ TOKEN VALIDATED");
-            foreach (var claim in context.Principal.Claims)
-            {
-                Console.WriteLine($"Claim: {claim.Type} = {claim.Value}");
-            }
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine("❌ Authentication failed: " + context.Exception.Message);
-            return Task.CompletedTask;
-        },
         OnMessageReceived = context =>
         {
-            // Capture token from Authorization header
             var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(authHeader))
+            if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             {
-                var token = authHeader;
-
-                // Remove any redundant "Bearer " prefixes
-                while (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                {
-                    token = token.Substring("Bearer ".Length).Trim();
-                }
-
-                context.Token = token;
+                context.Token = authHeader.Substring("Bearer ".Length).Trim();
             }
 
-            // Optional: check for query string token (for SignalR support)
+            // Support for SignalR token via query string (optional)
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
             if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chathub"))
@@ -126,73 +85,57 @@ builder.Services.AddAuthentication(options =>
         }
     };
 });
-// ------------------------------------------------
-// Add Authorization (can extend with policies if needed)
-// ------------------------------------------------
+
+// 3. Add Authorization (if you want policies or role-based auth)
 builder.Services.AddAuthorization();
-// ------------------------------------------------
-// Add Controllers
-// ------------------------------------------------
+
+// 4. Add Controllers
 builder.Services.AddControllers();
 
-// ------------------------------------------------
-// Configure Swagger/OpenAPI with JWT Authorization
-// ------------------------------------------------
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+// 5. Configure NSwag OpenAPI Document with JWT security definition
+builder.Services.AddOpenApiDocument(config =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "UserManagement API", Version = "v1" });
+    config.Title = "UserManagement API";
+    config.Version = "v1";
 
-    var securitySchema = new OpenApiSecurityScheme
+    // Add JWT Bearer security definition so Swagger UI shows the lock icon & token input
+    config.AddSecurity("JWT", Enumerable.Empty<string>(), new NSwag.OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'",
+        Type = OpenApiSecuritySchemeType.ApiKey,
         Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT"
-    };
+        In = OpenApiSecurityApiKeyLocation.Header,
+        Description = "Enter JWT Bearer token in the format: Bearer {your token}"
+    });
 
-    c.AddSecurityDefinition("Bearer", securitySchema);
+    // Adds security requirements to all operations decorated with [Authorize]
+    config.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("JWT"));
+});
 
-    var securityRequirement = new OpenApiSecurityRequirement
+// 6. Configure CORS (adjust origins as needed)
+const string DefaultCorsPolicyName = "AllowAll";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(DefaultCorsPolicyName, policy =>
     {
-        { securitySchema, new[] { "Bearer" } }
-    };
-
-    c.AddSecurityRequirement(securityRequirement);
-
-    // 👈 Add this line:
-    c.OperationFilter<AuthorizeCheckOperationFilter>();
+        policy.AllowAnyHeader()
+              .AllowAnyMethod()
+              .SetIsOriginAllowed(_ => true)
+              .AllowCredentials();
+    });
 });
 
 var app = builder.Build();
 
-// ✅ Path base from config
-var pathPrefix = configuration["App:UserManagementServerPathPrefix"] ?? "";
-if (!string.IsNullOrEmpty(pathPrefix) && !pathPrefix.StartsWith("/"))
-{
-    pathPrefix = "/" + pathPrefix;
-}
-if (!string.IsNullOrEmpty(pathPrefix))
-{
-    app.UsePathBase(pathPrefix);
-}
-
-// ------------------------------------------------
-// Middleware Pipeline Configuration
-// ------------------------------------------------
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint($"{pathPrefix}/swagger/v1/swagger.json", "UserManagement API v1");
-        c.RoutePrefix = "swagger";
-    });
+    app.UseOpenApi();      // Serves /swagger/v1/swagger.json
+    app.UseSwaggerUi();   // Serves Swagger UI at /swagger
 }
 
 app.UseHttpsRedirection();
+
+app.UseStaticFiles();
+
 app.UseCors(DefaultCorsPolicyName);
 
 app.Use(async (context, next) =>
@@ -202,18 +145,15 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseAuthentication(); // Enable authentication middleware
+app.UseAuthentication(); // IMPORTANT: Add Authentication before Authorization
+app.UseAuthorization();
 
-app.UseAuthorization();  // Enable authorization middleware
-
-app.UseStaticFiles();
 app.MapControllers();
-// ------------------------------------------------
-// Seed Default Tenant, SuperAdmin Role & User
-// ------------------------------------------------
+
 using (var scope = app.Services.CreateScope())
 {
     var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
     await seeder.SeedAsync();
 }
+
 app.Run();
