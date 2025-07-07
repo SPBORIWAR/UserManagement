@@ -9,3 +9,10 @@
 /UserManagement.Application/.vs
 /UserManagement.Application/UserManagement.Application/bin/Debug/net8.0
 /UserManagement.Application/UserManagement.Application/obj
+/Backend/UserManagement.Application/.vs
+/Backend/UserManagement.Application/UserManagement.Application/bin/Debug/net8.0
+/Backend/UserManagement.Application/UserManagement.Application/obj
+/Backend/UserManagment.BusinessLogic/bin/Debug/net8.0
+/Backend/UserManagment.BusinessLogic/obj
+/Backend/UserManagment.EntityFrameworkCore/bin/Debug/net8.0
+/Backend/UserManagment.EntityFrameworkCore/obj
