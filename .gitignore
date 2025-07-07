@@ -2,17 +2,14 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/UserManagment.BusinessLogic/bin/Debug/net8.0
-/UserManagment.BusinessLogic/obj
-/UserManagment.EntityFrameworkCore/bin/Debug/net8.0
-/UserManagment.EntityFrameworkCore/obj
-/UserManagement.Application/.vs
-/UserManagement.Application/UserManagement.Application/bin/Debug/net8.0
-/UserManagement.Application/UserManagement.Application/obj
 /Backend/UserManagement.Application/.vs
 /Backend/UserManagement.Application/UserManagement.Application/bin/Debug/net8.0
-/Backend/UserManagement.Application/UserManagement.Application/obj
 /Backend/UserManagment.BusinessLogic/bin/Debug/net8.0
-/Backend/UserManagment.BusinessLogic/obj
+/Backend/UserManagment.BusinessLogic/obj/Debug/net8.0
 /Backend/UserManagment.EntityFrameworkCore/bin/Debug/net8.0
-/Backend/UserManagment.EntityFrameworkCore/obj
+/Backend/UserManagment.EntityFrameworkCore/obj/Debug/net8.0
+/Backend/UserManagement.Application/UserManagement.Application/obj/Debug/net8.0
+*.json
+*.cache
+*.props
+*.targets
