@@ -7,7 +7,7 @@ using UserManagement.BusinessLogic.TenantManagement;
 
 namespace UserManagement.Application.TenantManagement
 {
-    [Authorize(Roles = "SuperAdmin")]
+    //[Authorize(Roles = "SuperAdmin")]
     [ApiController]
     [Route("api/[controller]")]
     
@@ -26,6 +26,7 @@ namespace UserManagement.Application.TenantManagement
         /// <summary>
         /// Creates a new tenant with default admin and user.
         /// </summary>
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPost("create")]
         [SwaggerOperation(Summary = "Create a new tenant")]
         public async Task<IActionResult> CreateTenant([FromBody] CreateTenantDto dto)
@@ -38,6 +39,7 @@ namespace UserManagement.Application.TenantManagement
         /// <summary>
         /// Gets all tenants.
         /// </summary>
+        [AllowAnonymous]
         [HttpGet("all")]
         [SwaggerOperation(Summary = "Get all tenants")]
         public async Task<IActionResult> GetAll()
@@ -50,6 +52,7 @@ namespace UserManagement.Application.TenantManagement
         /// <summary>
         /// Gets a tenant by its ID.
         /// </summary>
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("{id}")]
         [SwaggerOperation(Summary = "Get tenant by ID")]
         public async Task<IActionResult> GetById(long id)
@@ -62,6 +65,7 @@ namespace UserManagement.Application.TenantManagement
         /// <summary>
         /// Updates a tenant.
         /// </summary>
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPut("{id}")]
         [SwaggerOperation(Summary = "Update tenant")]
         public async Task<IActionResult> Update(long id, [FromBody] UpdateTenantDto dto)
@@ -74,6 +78,7 @@ namespace UserManagement.Application.TenantManagement
         /// <summary>
         /// Deletes a tenant.
         /// </summary>
+        [Authorize(Roles = "SuperAdmin")]
         [HttpDelete("{id}")]
         [SwaggerOperation(Summary = "Delete tenant")]
         public async Task<IActionResult> Delete(long id)
