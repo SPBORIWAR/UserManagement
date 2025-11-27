@@ -63,14 +63,14 @@ namespace UserManagement.BusinessLogic.DatabaseSeed
 
                 // Seed Permissions
                 var permissions = new List<Permission>
-        {
-            new Permission { Name = "Pages", TenantId = (int)tenantId },
-            new Permission { Name = "Pages.Dashboard", TenantId = (int)tenantId },
-            new Permission { Name = "Pages.Administration", TenantId = (int)tenantId },
-            new Permission { Name = "Pages.Administration.Tenant", TenantId = (int)tenantId },
-            new Permission { Name = "Pages.Administration.Roles", TenantId = (int)tenantId },
-            new Permission { Name = "Pages.Administration.Permission", TenantId = (int)tenantId }
-        };
+                {
+                    new Permission { Name = "Pages", TenantId = (int)tenantId },
+                    new Permission { Name = "Pages.Dashboard", TenantId = (int)tenantId },
+                    new Permission { Name = "Pages.Administration", TenantId = (int)tenantId },
+                    new Permission { Name = "Pages.Administration.Tenant", TenantId = (int)tenantId },
+                    new Permission { Name = "Pages.Administration.Roles", TenantId = (int)tenantId },
+                    new Permission { Name = "Pages.Administration.Permission", TenantId = (int)tenantId }
+                };
 
                 foreach (var permission in permissions)
                 {

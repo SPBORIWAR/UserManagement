@@ -76,17 +76,17 @@ namespace UserManagement.BusinessLogic.TenantManagement
 
                 // Seed default permissions for the tenant
                 var defaultPermissions = new List<string>
-        {
-            "Pages",
-            "Pages.Dashboard",
-            "Pages.Administration",
-            "Pages.Administration.Tenant",
-            "Pages.Administration.Tenant.Create",
-            "Pages.Administration.Role",
-            "Pages.Administration.Role.Create",
-            "Pages.Administration.Permission",
-            "Pages.Administration.Permission.Create"
-        };
+                {
+                    "Pages",
+                    "Pages.Dashboard",
+                    "Pages.Administration",
+                    "Pages.Administration.Tenant",
+                    "Pages.Administration.Tenant.Create",
+                    "Pages.Administration.Role",
+                    "Pages.Administration.Role.Create",
+                    "Pages.Administration.Permission",
+                    "Pages.Administration.Permission.Create"
+                };
 
                 var permissionIds = new List<long>();
 
